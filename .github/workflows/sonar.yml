@@ -6,25 +6,26 @@ on:
 jobs:
   build-analyze-scan:
     name: Build
-    runs-on: [linux]
+    runs-on: [linux]  #using self-hosted runner to run the github workflow(ec2 server used here)
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
-      - name: Build and analyze with SonarQube
+          
+      - name: Build and analyze with SonarQube  #running sonar scanner for the code
         uses: sonarsource/sonarqube-scan-action@master
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # giving sonar token to login into the sonar
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-      - name: npm install dependency
+      - name: npm install dependency  # run & install npm since it is node js appln
         run: npm install
 
-      - name: Trivy file scan
+      - name: Trivy file scan  # trivy scan is used to check the vulnerability in code
         run: trivy fs . > trivyfs.txt
 
-      - name: Docker Build and push
+      - name: Docker Build and push  # build docker image and push image in docker hub
         run: |
           docker build -t tic-tac-toe .    # building docker image
           docker tag tic-tac-toe monikamurali/tic-tac-toe:latest  # tagging image name 
@@ -33,7 +34,18 @@ jobs:
         env: 
           DOCKER_CLI_ACI: 1
 
-      - name: Trivy Image Scan
+      - name: Trivy Image Scan  # trivy used here to scan the image to check vulnerailibty
         run: trivy image monikamurali/tic-tac-toe:latest > trivyimage.txt
-      
-          
+  
+  deploy:  #deploying the image in eks
+   needs: build-analyze-scan  # condition to deploy - only if above job is completely run then deploy it
+   runs-on: [self-hosted]
+   steps:
+      - name: docker pull image
+        run: docker pull monikamurali/tic-tac-toe:latest
+
+      - name: Trivy Image Scan  # trivy used here to scan the image to check vulnerailibty
+        run: trivy image monikamurali/tic-tac-toe:latest > trivyimagedeploy.txt
+
+      - name: deploy to container
+        run: docker run -d --name game -p 3000:3000 monikamurali/tic-tac-toe:latest
