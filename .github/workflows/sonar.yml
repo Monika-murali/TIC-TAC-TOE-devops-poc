@@ -47,6 +47,11 @@ jobs:
       - name: Trivy Image Scan  # trivy used here to scan the image to check vulnerailibty
         run: trivy image monikamurali/tic-tac-toe:latest > trivyimagedeploy.txt
 
+      - name: remove old container
+        run: |
+          docker stop game || true
+          docker rm game || true
+
       - name: deploy to container
         run: docker run -d --name game -p 3000:3000 monikamurali/tic-tac-toe:latest
 
